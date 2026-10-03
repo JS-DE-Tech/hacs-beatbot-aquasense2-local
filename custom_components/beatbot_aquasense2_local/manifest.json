@@ -1,0 +1,13 @@
+{
+  "domain": "beatbot_aquasense2_local",
+  "name": "Beatbot AquaSense 2 Local",
+  "version": "0.4.3",
+  "dependencies": ["file_upload", "http"],
+  "documentation": "https://github.com/JS-DE-Tech/hacs-beatbot-aquasense2-local",
+  "issue_tracker": "https://github.com/JS-DE-Tech/hacs-beatbot-aquasense2-local/issues",
+  "codeowners": ["@JS-DE-Tech"],
+  "config_flow": true,
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["tinytuya==1.20.0"]
+}

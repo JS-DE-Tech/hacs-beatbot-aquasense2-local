@@ -1,0 +1,127 @@
+{
+  "title": "Beatbot AquaSense 2 Local",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a local AquaSense 2",
+        "menu_options": {
+          "key_file": "Import key file",
+          "manual": "Enter local key manually"
+        }
+      },
+      "key_file": {
+        "title": "Import robot key file",
+        "description": "Select your private .beatbot-key.json file. It contains the robot ID and local key. Keep it private. The temporary upload is removed after reading.",
+        "data": {
+          "key_file": "Key file"
+        }
+      },
+      "key_connect": {
+        "title": "Connect the imported robot",
+        "description": "Robot ID: {device_id}. Wake the robot and keep it on the same network as Home Assistant. Leave the IP field empty to discover its current address. The local key has already been imported.",
+        "data": {
+          "name": "Robot name (optional)",
+          "host": "LAN IP address (optional)"
+        },
+        "data_description": {
+          "name": "Shown as Beatbot AquaSense 2 - your name. Leave empty to use Beatbot AquaSense 2."
+        }
+      },
+      "manual": {
+        "title": "Add a local AquaSense 2",
+        "description": "Matching robots found on this network: {count}. Enter the robot ID and its private 16-character local key. The robot must be reachable during setup. You can enter its LAN IP if discovery misses it.",
+        "data": {
+          "name": "Robot name (optional)",
+          "device_id": "Robot ID",
+          "local_key": "Local key",
+          "host": "LAN IP address (optional)"
+        },
+        "data_description": {
+          "name": "Shown as Beatbot AquaSense 2 - your name. Leave empty to use Beatbot AquaSense 2."
+        }
+      }
+    },
+    "error": {
+      "invalid_key_file": "Invalid or expired upload. Select a supported AquaSense 2 key file (maximum 16 KiB).",
+      "host_required": "Enter a private LAN IP address or let discovery find the robot.",
+      "device_required": "Enter the robot ID.",
+      "invalid_local_key": "The local key must have 16 characters.",
+      "not_found": "No matching AquaSense 2 responded to LAN discovery. Make sure it is awake and on the same network.",
+      "cannot_connect": "The robot did not answer locally. Check its key, IP address and Wi-Fi connection."
+    },
+    "abort": {
+      "already_configured": "This robot has already been added."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Charging, completion notifications and runtimes",
+        "menu_options": {
+          "settings": "Charging plug and completion notification",
+          "history": "View and edit runtimes",
+          "history_export": "Export runtimes",
+          "history_import": "Import runtimes"
+        }
+      },
+      "settings": {
+        "title": "Charging plug and completion notification",
+        "description": "A confirmed completion below the charge target starts a two-hour wait; a new run cancels it. Choose a phone or Telegram and enable Fertigmeldung. Set up Telegram in HA first, authorize the chat ID there, then paste it here (negative IDs for groups). Select the bot if several exist. Optionally upload a JPG/PNG (max. 10 MiB): Telegram sends one photo with a caption. No new upload keeps the existing image. Saved image: {photo_status}. Removing disables the image; old files remain as backups in the private HA image folder. Saving does not send a test message.",
+        "data": {
+          "charger_switch": "Charging switch entity",
+          "notify_service": "Completion notification target",
+          "telegram_bot_entry_id": "Telegram bot (choose if multiple)",
+          "telegram_chat_id": "Telegram chat ID (paste here)",
+          "photo_upload": "Upload / replace Telegram image (.jpg, .png)",
+          "remove_photo": "Stop using the saved image"
+        }
+      },
+      "history": {
+        "title": "Runtimes for every program combination",
+        "description": "{overview}\n\nSelect a combination to edit. Runtimes and battery consumption belong to this robot and pool.",
+        "data": {
+          "program": "Program / combination"
+        }
+      },
+      "history_edit": {
+        "title": "Edit runtimes",
+        "description": "{program}\n\nOne duration in minutes per line, up to ten values from 1 to 720 minutes. Decimals are allowed. These replace the combination's time samples; empty deletes them. An optional manual estimate takes priority immediately; clear it to resume automatic estimates. Battery samples are retained. Changes are saved immediately.",
+        "data": {
+          "samples_minutes": "Runtime samples in minutes – one per line",
+          "manual_minutes": "Manual estimated duration in minutes (optional)"
+        }
+      },
+      "history_export": {
+        "title": "Export runtimes",
+        "description": "[Download runtimes as JSON]({download_url})\n\nThe link expires in five minutes. Includes all 14 combinations, duration/battery samples and manual estimates. Contains the robot ID for matching, but no local key. Submit to return to the menu."
+      },
+      "history_import": {
+        "title": "Import runtimes",
+        "description": "Older confirmed run files add samples without duplicates. A full export replaces this robot's entire learning history and manual estimates; confirm replacement below. Export first if needed. Import only outside a cleaning run. Maximum 128 KiB.",
+        "data": {
+          "runtime_file": "Runtime file (.json)",
+          "replace_history": "Replace existing learning history with a full export"
+        }
+      }
+    },
+    "error": {
+      "already_assigned": "This switch is already assigned to another Beatbot robot.",
+      "proxy_not_allowed": "Select the physical plug, not a Beatbot charging switch.",
+      "invalid_runtime_file": "Invalid, expired, conflicting or wrong-robot runtime file. Select it again (maximum 128 KiB).",
+      "runtime_unavailable": "Load this robot's integration first.",
+      "runtime_busy": "Changes are blocked during cleaning or shutdown. Try again after completion.",
+      "invalid_times": "Enter at most ten samples and an optional estimate, each between 1 and 720 minutes.",
+      "save_failed": "Reading or saving failed. Existing learning data is retained.",
+      "confirm_replace": "Confirm history replacement and select the file again.",
+      "use_history_import": "Use Import runtimes to restore a full export.",
+      "notify_unavailable": "Notification service unavailable. Set up the HA mobile app or Telegram bot first.",
+      "telegram_bot_required": "Choose a Telegram bot configured in HA. A single bot is selected automatically.",
+      "invalid_telegram_chat": "Enter one numeric chat ID, e.g. 123456789 or -1001234567890. Not a bot token, username or a list.",
+      "invalid_telegram_photo": "Could not store the photo. Select a JPG/PNG up to 10 MiB again; the previous image is retained.",
+      "photo_conflict": "Either upload a new image or remove the saved image, not both."
+    },
+    "abort": {
+      "runtime_unavailable": "Load this robot's integration first."
+    }
+  }
+}

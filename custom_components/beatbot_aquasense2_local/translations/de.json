@@ -1,0 +1,127 @@
+{
+  "title": "Beatbot AquaSense 2 Lokal",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lokalen AquaSense 2 hinzufügen",
+        "menu_options": {
+          "key_file": "Schlüsseldatei importieren",
+          "manual": "Lokalen Schlüssel manuell eingeben"
+        }
+      },
+      "key_file": {
+        "title": "Roboter-Schlüsseldatei importieren",
+        "description": "Die private .beatbot-key.json-Datei auswählen. Sie enthält Roboter-ID und lokalen Schlüssel. Bitte vertraulich aufbewahren. Die temporär hochgeladene Kopie wird nach dem Einlesen entfernt.",
+        "data": {
+          "key_file": "Schlüsseldatei"
+        }
+      },
+      "key_connect": {
+        "title": "Importierten Roboter verbinden",
+        "description": "Roboter-ID: {device_id}. Den Roboter aufwecken und im selben Netzwerk wie Home Assistant bereithalten. Das IP-Feld für die automatische Suche leer lassen. Der lokale Schlüssel wurde bereits importiert.",
+        "data": {
+          "name": "Robotername (optional)",
+          "host": "LAN-IP-Adresse (optional)"
+        },
+        "data_description": {
+          "name": "Anzeige als Beatbot AquaSense 2 - dein Name. Ohne Zusatz lautet der Gerätename Beatbot AquaSense 2."
+        }
+      },
+      "manual": {
+        "title": "Lokalen AquaSense 2 hinzufügen",
+        "description": "Im Netzwerk gefundene passende Roboter: {count}. Roboter-ID und privaten lokalen Schlüssel mit 16 Zeichen eingeben. Der Roboter muss während der Einrichtung erreichbar sein. Falls die Suche ihn nicht findet, kann die LAN-IP eingetragen werden.",
+        "data": {
+          "name": "Robotername (optional)",
+          "device_id": "Roboter-ID",
+          "local_key": "Lokaler Schlüssel",
+          "host": "LAN-IP-Adresse (optional)"
+        },
+        "data_description": {
+          "name": "Anzeige als Beatbot AquaSense 2 - dein Name. Ohne Zusatz lautet der Gerätename Beatbot AquaSense 2."
+        }
+      }
+    },
+    "error": {
+      "invalid_key_file": "Ungültiger oder abgelaufener Upload. Eine unterstützte AquaSense-2-Schlüsseldatei mit höchstens 16 KiB auswählen.",
+      "host_required": "Eine private LAN-IP-Adresse eingeben oder den Roboter suchen lassen.",
+      "device_required": "Roboter-ID eingeben.",
+      "invalid_local_key": "Der lokale Schlüssel muss 16 Zeichen haben.",
+      "not_found": "Bei der LAN-Suche antwortete kein passender AquaSense 2. Roboter aufwecken und Netzwerk prüfen.",
+      "cannot_connect": "Der Roboter antwortet lokal nicht. Schlüssel, IP-Adresse und WLAN prüfen."
+    },
+    "abort": {
+      "already_configured": "Dieser Roboter wurde bereits hinzugefügt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ladeplanung, Fertigmeldung und Laufzeiten",
+        "menu_options": {
+          "settings": "Ladestation und Fertigmeldung",
+          "history": "Laufzeiten ansehen und bearbeiten",
+          "history_export": "Laufzeiten exportieren",
+          "history_import": "Laufzeiten importieren"
+        }
+      },
+      "settings": {
+        "title": "Ladestation und Fertigmeldung",
+        "description": "Nach bestätigtem Reinigungsende (auch durch Parken) beginnt bei Akku unter dem Ladeziel eine Wartezeit von zwei Stunden. Eine neue Reinigung bricht den Timer ab. Für Fertigmeldungen Smartphone oder Telegram auswählen und den Schalter Fertigmeldung einschalten. Telegram muss zuvor in HA eingerichtet sein; die Chat-ID dort freigeben und hier einfügen (Gruppen-IDs mit Minuszeichen). Bei mehreren Bots einen auswählen. Optional eigenes JPG/PNG hochladen (max. 10 MiB): Telegram sendet Bild und Text als eine Nachricht. Ohne neuen Upload bleibt das bisherige Bild erhalten. Bild gespeichert: {photo_status}. Entfernen deaktiviert das Bild; alte Dateien bleiben als Sicherung im privaten HA-Bildordner. Kein Testversand beim Speichern.",
+        "data": {
+          "charger_switch": "Schalter für die Ladestation",
+          "notify_service": "Ziel für die Fertigmeldung",
+          "telegram_bot_entry_id": "Telegram-Bot (bei mehreren auswählen)",
+          "telegram_chat_id": "Telegram Chat-ID (selbst einfügen)",
+          "photo_upload": "Eigenes Telegram-Bild hochladen / ersetzen (.jpg, .png)",
+          "remove_photo": "Gespeichertes Bild nicht mehr verwenden"
+        }
+      },
+      "history": {
+        "title": "Laufzeiten aller Programmvarianten",
+        "description": "{overview}\n\nProgramm zum Bearbeiten auswählen. Zeiten und Akkuverbrauch gelten nur für diesen Roboter und Pool.",
+        "data": {
+          "program": "Programm / Kombination"
+        }
+      },
+      "history_edit": {
+        "title": "Laufzeiten bearbeiten",
+        "description": "{program}\n\nJe Zeile eine Laufzeit in Minuten (Dezimalstellen erlaubt), maximal zehn Werte von 1 bis 720 Minuten. Änderungen ersetzen die Zeitproben dieser Kombination. Leer lassen löscht sie. Eine manuelle Schätzung gilt sofort und hat Vorrang vor dem Lernen; leer lassen stellt die automatische Schätzung wieder her. Akku-Messwerte bleiben erhalten. Änderungen werden sofort gespeichert.",
+        "data": {
+          "samples_minutes": "Einzelne Laufzeiten in Minuten – eine pro Zeile",
+          "manual_minutes": "Manuelle geschätzte Dauer in Minuten (optional)"
+        }
+      },
+      "history_export": {
+        "title": "Laufzeiten exportieren",
+        "description": "[Laufzeiten als JSON herunterladen]({download_url})\n\nDer Download-Link ist fünf Minuten gültig. Enthalten sind alle 14 Kombinationen, Zeit- und Akku-Messwerte sowie manuelle Schätzungen. Die Datei enthält die Roboter-ID zur Zuordnung, aber keinen lokalen Schlüssel. Mit Absenden zurück zum Menü."
+      },
+      "history_import": {
+        "title": "Laufzeiten importieren",
+        "description": "Alte bestätigte Laufdateien ergänzen die Historie ohne Doppelzählung. Ein vollständiger Export ersetzt die gesamte Lernhistorie dieses Roboters einschließlich manueller Schätzungen; dafür das Bestätigungsfeld aktivieren. Vorher bei Bedarf exportieren. Nur außerhalb einer Reinigung importieren. Maximal 128 KiB.",
+        "data": {
+          "runtime_file": "Laufzeiten-Datei (.json)",
+          "replace_history": "Vorhandene Lernhistorie durch einen vollständigen Export ersetzen"
+        }
+      }
+    },
+    "error": {
+      "already_assigned": "Dieser Schalter ist bereits einem anderen Beatbot zugeordnet.",
+      "proxy_not_allowed": "Die echte Steckdose wählen, nicht einen Beatbot-Ladestationsschalter.",
+      "invalid_runtime_file": "Ungültige, abgelaufene, widersprüchliche oder zu einem anderen Roboter gehörende Laufdatei. Datei erneut auswählen (maximal 128 KiB).",
+      "runtime_unavailable": "Die Integration dieses Roboters muss geladen sein.",
+      "runtime_busy": "Während einer Reinigung oder beim Stop sind Änderungen gesperrt. Nach dem Abschluss erneut versuchen.",
+      "invalid_times": "Maximal zehn Laufzeiten und eine optionale Schätzung eingeben, jeweils 1 bis 720 Minuten.",
+      "save_failed": "Speichern oder Lesen fehlgeschlagen. Vorhandene Lernwerte bleiben erhalten.",
+      "confirm_replace": "Ersetzen der Historie bestätigen und die Datei erneut auswählen.",
+      "use_history_import": "Vollständige Exporte über Laufzeiten importieren einlesen.",
+      "notify_unavailable": "Benachrichtigungsdienst nicht verfügbar. Smartphone über HA-App oder Telegram-Bot in HA zuerst einrichten.",
+      "telegram_bot_required": "Einen in HA eingerichteten Telegram-Bot auswählen. Bei genau einem Bot ist die Auswahl automatisch.",
+      "invalid_telegram_chat": "Eine einzelne numerische Chat-ID eingeben, z. B. 123456789 oder -1001234567890. Kein Bot-Token, Benutzername oder mehrere IDs.",
+      "invalid_telegram_photo": "Bild konnte nicht gespeichert werden. JPG/PNG bis 10 MiB erneut auswählen; bisheriges Bild bleibt erhalten.",
+      "photo_conflict": "Entweder ein neues Bild hochladen oder das vorhandene entfernen, nicht beides."
+    },
+    "abort": {
+      "runtime_unavailable": "Die Integration dieses Roboters muss geladen sein."
+    }
+  }
+}
