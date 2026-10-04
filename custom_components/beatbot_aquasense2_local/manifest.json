@@ -1,7 +1,7 @@
 {
   "domain": "beatbot_aquasense2_local",
   "name": "Beatbot AquaSense 2 Local",
-  "version": "0.4.3",
+  "version": "0.4.5",
   "dependencies": ["file_upload", "http"],
   "documentation": "https://github.com/JS-DE-Tech/hacs-beatbot-aquasense2-local",
   "issue_tracker": "https://github.com/JS-DE-Tech/hacs-beatbot-aquasense2-local/issues",

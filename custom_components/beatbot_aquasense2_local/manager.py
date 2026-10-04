@@ -37,6 +37,7 @@ from .const import (
     DOMAIN,
     STATUS_LABELS,
     LEGACY_STATUS_LABELS,
+    DIVING_DISPLAY_DURATION,
 )
 from .protocol import LocalBeatbot, decode_mode, discover, status_name, decode_filter_basket_missing
 from .policy import charge_cutoff_due
@@ -102,6 +103,8 @@ class BeatbotManager:
         self._charge_start_retry_at: datetime | None = None
         self.robot_status: str | None = None
         self.cleaning_state: str | None = None
+        self.diving_started_at: datetime | None = None
+        self._diving_timer: asyncio.TimerHandle | None = None
         self.cleaning_started_at: datetime | None = None
         self.position: int | None = None
         self.last_seen: datetime | None = None
@@ -172,6 +175,16 @@ class BeatbotManager:
         # restored data as a fresh report or firing any completion side effects.
         if self.robot_status in STATUS_LABELS and self.robot_status != "standby":
             self.cleaning_state = STATUS_LABELS[self.robot_status]
+        diving_started = _parse_time(saved.get("diving_started_at"))
+        self.diving_started_at = (
+            diving_started if diving_started and diving_started <= _now()
+            and (self.robot_status == "diving" or (
+                self.robot_status == "standby" and self.cleaning_state in {"Taucht ab", "Reinigt"}
+            )) else None
+        )
+        # Old versions did not store a diving time: do not invent a new 90s
+        # window from a stale report. A new observed transition starts one.
+        self._refresh_diving_display(_now())
         self.last_seen = _parse_time(saved.get("last_seen"))
         target = saved.get("charge_target")
         self.charge_target = target if target in (80, 100) else 100
@@ -208,6 +221,39 @@ class BeatbotManager:
         self._task = self.entry.async_create_background_task(
             self.hass, self._run(), f"{DOMAIN} polling {self.entry.entry_id}"
         )
+        if self._refresh_diving_display(_now()):
+            self._notify()
+        self._schedule_diving_display()
+
+    def _refresh_diving_display(self, now: datetime) -> bool:
+        if self.cleaning_state == "Taucht ab" and (
+            self.diving_started_at is None
+            or now >= self.diving_started_at + DIVING_DISPLAY_DURATION
+        ):
+            self.cleaning_state = "Reinigt"
+            return True
+        return False
+
+    def _schedule_diving_display(self) -> None:
+        if self._diving_timer is not None:
+            self._diving_timer.cancel()
+            self._diving_timer = None
+        if (self._stopping or self._task is None or self._task.done()
+                or self.diving_started_at is None or self.cleaning_state != "Taucht ab"):
+            return
+        delay = max(0, (self.diving_started_at + DIVING_DISPLAY_DURATION - _now()).total_seconds())
+        self._diving_timer = asyncio.get_running_loop().call_later(delay, self._on_diving_display_due)
+
+    @callback
+    def _on_diving_display_due(self) -> None:
+        self._diving_timer = None
+        if self._stopping:
+            return
+        if self._refresh_diving_display(_now()):
+            self._save_soon()
+            self._notify()
+        else:
+            self._schedule_diving_display()  # Wall-clock correction / early callback.
 
     async def _on_hass_stop(self, _event: Any) -> None:
         # HA has already removed this async_listen_once listener before dispatch.
@@ -227,6 +273,9 @@ class BeatbotManager:
         await asyncio.shield(self._stop_task)
 
     async def _async_finish_stop(self) -> None:
+        if self._diving_timer is not None:
+            self._diving_timer.cancel()
+            self._diving_timer = None
         if self._unsubscribe_stop:
             self._unsubscribe_stop()
             self._unsubscribe_stop = None
@@ -284,6 +333,7 @@ class BeatbotManager:
             "mode_pending": self.mode_pending,
             "robot_status": self.robot_status,
             "cleaning_state": self.cleaning_state,
+            "diving_started_at": self.diving_started_at.isoformat() if self.diving_started_at else None,
             "cleaning_started_at": self.cleaning_started_at.isoformat() if self.cleaning_started_at else None,
             "last_seen": self.last_seen.isoformat() if self.last_seen else None,
             "charge_target": self.charge_target,
@@ -367,6 +417,9 @@ class BeatbotManager:
                     self.filter_cleaning_required = False
                     self._save_soon()
                 self._failures += 1
+                if self._refresh_diving_display(_now()):
+                    self._save_soon()
+                self._schedule_diving_display()
                 self._notify()
                 _LOGGER.debug("AquaSense 2 LAN not reachable: %s", type(err).__name__)
                 if self._failures >= 3 and (not self._last_discovery or now - self._last_discovery > timedelta(minutes=5)):
@@ -416,7 +469,8 @@ class BeatbotManager:
             fresh_battery = battery if type(battery) is int and 0 <= battery <= 100 else None
             self.runtime.observe(state, learning_program, now.timestamp(),
                                  self.park_pending, fresh_battery, position)
-            completed = self.completion.observe(state, position, now.timestamp())
+            completed = self.completion.observe(
+                state, position, now.timestamp(), learning_program.key if learning_program else None)
             # Charge planning may use the last stored battery even after power-off.
             # Charge cutoff below still requires a fresh post-switch-on reading.
             self.cooldown.observe(state, self.battery, now.timestamp(), completed, self.charge_target)
@@ -426,6 +480,13 @@ class BeatbotManager:
             if "107" in dps and decode_filter_basket_missing(dps["107"]) is True:
                 self.filter_cleaning_required = False
             if state:
+                transient_standby = state == "standby" and not dry_ready and (
+                    self.runtime.active or self.completion.active)
+                if state == "diving":
+                    if self.diving_started_at is None and self.robot_status != "diving":
+                        self.diving_started_at = _now()
+                elif not transient_standby:
+                    self.diving_started_at = None
                 self.robot_status = state
                 if state != "standby":
                     self.cleaning_state = STATUS_LABELS[state]
@@ -437,6 +498,8 @@ class BeatbotManager:
                     STATUS_LABELS["clean_done"], STATUS_LABELS["auto_dock"], STATUS_LABELS["dock"]
                 }:
                     self.cleaning_state = "Bereit"
+            self._refresh_diving_display(_now())
+            self._schedule_diving_display()
             if type(position) is int:
                 self.position = position
             current_mode = decode_mode(dps.get("132"))
@@ -508,7 +571,7 @@ class BeatbotManager:
         if not self.completion_notifications or not service:
             return
         try:
-            domain, service, data = completion_call(self.entry.options)
+            domain, service, data = completion_call(self.entry.options, self.completion.program_key)
             if domain == "telegram_bot" and service == "send_photo":
                 photo = await self._async_executor(validate_photo, self.hass, data["file"])
                 # Only our dedicated private image folder, never /config or www.

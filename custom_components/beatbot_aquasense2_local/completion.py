@@ -2,6 +2,8 @@
 
 from math import isfinite
 
+from .runtime import PROGRAMS
+
 SURFACE_WINDOW = 10 * 60
 
 
@@ -10,9 +12,11 @@ class CompletionTracker:
         self.active = False
         self.finished = False
         self.emerged_at: float | None = None
+        self.program_key: str | None = None
 
     def dump(self) -> dict:
-        return {"active": self.active, "finished": self.finished, "emerged_at": self.emerged_at}
+        return {"active": self.active, "finished": self.finished,
+                "emerged_at": self.emerged_at, "program_key": self.program_key}
 
     def restore(self, saved) -> None:
         if not isinstance(saved, dict):
@@ -21,8 +25,16 @@ class CompletionTracker:
         self.finished = saved.get("finished") is True
         value = saved.get("emerged_at")
         self.emerged_at = value if type(value) in (float, int) and isfinite(value) else None
+        key = saved.get("program_key")
+        self.program_key = key if isinstance(key, str) and key in PROGRAMS else None
 
-    def observe(self, state: str | None, position, now: float) -> bool:
+    def observe(self, state: str | None, position, now: float,
+                program_key: str | None = None) -> bool:
+        # Freeze the identity when this run is first observed. Program changes
+        # and a newly selected preset must not rename the finished run.
+        if not self.active and (state in {"cleaning", "diving", "clean_wait"}
+                               or not self.finished and state == "emerge"):
+            self.program_key = program_key if isinstance(program_key, str) and program_key in PROGRAMS else None
         if state in {"cleaning", "diving", "clean_wait"}:
             self.active, self.finished, self.emerged_at = True, False, None
         elif state == "emerge" and not self.finished:
@@ -37,4 +49,5 @@ class CompletionTracker:
         elif (state == "standby" and type(position) is int and position == 0
               or state in {"sleep", "charging", "charge_done", "goto_charge"}):
             self.active, self.finished, self.emerged_at = False, False, None
+            self.program_key = None
         return False

@@ -16,6 +16,7 @@ CONF_TELEGRAM_PHOTO = "telegram_photo"
 TELEGRAM_NOTIFY = "telegram_bot"
 OFFLINE_IDLE_STATES = {"standby", "sleep", "charge_done", "clean_done", "auto_dock", "dock"}
 OFFLINE_OFF_DELAY = timedelta(minutes=5)
+DIVING_DISPLAY_DURATION = timedelta(seconds=90)
 
 MODE_VALUES = {
     "Boden": 0,
@@ -59,7 +60,7 @@ STATUS_LABELS = {
     "remote_control": "Manuelle Steuerung",
     "clean_wait": "Wartet auf Reinigung",
     "wifi_connect": "WLAN-Verbindung wird hergestellt",
-    "diving": "Reinigt – taucht ab",
+    "diving": "Taucht ab",
     "emerge": "Aufgetaucht – fährt zum Rand",
     "auto_dock": "Geparkt am Beckenrand",
     "dock": "Dockstatus – unbestätigt",
@@ -67,6 +68,7 @@ STATUS_LABELS = {
 # Device observations, not merely decoded enums or unit-test coverage.
 VERIFIED_STATUS_VALUES = {"standby", "charging", "cleaning", "sleep", "diving", "emerge", "auto_dock"}
 LEGACY_STATUS_LABELS = {
+    "Reinigt – taucht ab": STATUS_LABELS["diving"],
     "Schwebend": STATUS_LABELS["emerge"],
     "Geparkt": STATUS_LABELS["auto_dock"],
     "Parkt": STATUS_LABELS["auto_dock"],

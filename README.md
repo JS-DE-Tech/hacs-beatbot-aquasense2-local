@@ -135,14 +135,17 @@ Ein bestätigter Abschluss setzt die persistente Erinnerung **Filterkorb reinige
 
 Der vorhandene Sensor **Reinigungsstatus** zeigt dann „Ausgeschaltet“. Das ist eine Annahme aus Status und Erreichbarkeit; auch eine Netzwerkstörung kann sie auslösen. Die Attribute `inferred_off`, `inference` und `last_reported_status` machen das sichtbar; der technische Roboterstatus bleibt unverändert. Nach erfolgreicher Abfrage endet die Ableitung sofort. Nach HA-Neustart werden erneut fünf Minuten erfolglose Abfragen abgewartet.
 
-Für Benachrichtigungen unter **Konfigurieren → Ladestation und Fertigmeldung** ein Smartphone (registrierter `notify.mobile_app_*`-Dienst der HA-App) oder **Telegram** auswählen und am Roboter den Schalter **Fertigmeldung** einschalten. Ab 0.4.3 lautet der Nachrichtentext für beide Ziele exakt:
+Für Benachrichtigungen unter **Konfigurieren → Ladestation und Fertigmeldung** ein Smartphone (registrierter `notify.mobile_app_*`-Dienst der HA-App) oder **Telegram** auswählen und am Roboter den Schalter **Fertigmeldung** einschalten. Ab 0.4.5 enthält die Meldung das Programm des abgeschlossenen Laufs, zum Beispiel:
 
 ```text
-✅ Beatbot fertig.
-AquaSense 2 - Gewähltes Programm beendet.
+✅ Der Pool ist wieder sauber – AquaSense 2 – Bereich – Boden ×2, Wand & Wasserlinie ×2 beendet.
 ```
 
-„Gewähltes Programm“ ist hier bewusst der gewünschte feste Text, kein Platzhalter. Akkuwert und Filterhinweis werden nicht mehr an die Nachricht angehängt; ihre Entitäten bleiben unverändert. Standardeinstellung des Schalters ist aus. Der Abschluss wird vor dem Senden gespeichert; Neustarts wiederholen die Nachricht nicht. Pro erkanntem Abschluss maximal ein Zustellversuch. Fehler werden ohne Empfänger-/Token-Daten protokolliert, nicht automatisch wiederholt. Kein Testversand beim Speichern oder Einschalten des Schalters; echte Zustellung nach Installation noch prüfen.
+Mit persönlichem Bild steht dieser Text als Bildunterschrift unter dem Foto, zusammen in einer Telegram-Nachricht; ohne Bild als Textnachricht. Smartphone-Push nutzt „✅ Der Pool ist wieder sauber“ als Titel und den restlichen Text als Nachricht. Alle 14 Varianten werden unterstützt: Boden, Standard, acht Bereich-Kombinationen einschließlich ×0, MultiZone mit 1h/2h/Max und ECO.
+
+Das bei der ersten erkannten Laufphase bestätigte Programm wird für die Fertigmeldung gespeichert, unabhängig von der Lernberechtigung. Eine spätere Vorauswahl oder ein Neustart benennt den Lauf nicht um. Fehlt eine verlässliche Zuordnung (etwa bei einem Altstand ohne gespeichertes Laufprogramm), lautet der Text vorsichtig „✅ Der Pool ist wieder sauber – AquaSense 2 – Reinigung beendet (Programm unbekannt).“ Es wird kein Programm aus der aktuellen Vorauswahl geraten. Auch ein durch Parken bestätigter Abschluss verwendet den vereinbarten Meldungstext; er garantiert nicht die vollständige Abarbeitung des Programms.
+
+Akkuwert und Filterhinweis werden nicht an die Nachricht angehängt; ihre Entitäten bleiben unverändert. Standardeinstellung des Schalters ist aus. Der Abschluss wird vor dem Senden gespeichert; Neustarts wiederholen die Nachricht nicht. Pro erkanntem Abschluss maximal ein Zustellversuch. Fehler werden ohne Empfänger-/Token-Daten protokolliert, nicht automatisch wiederholt. Kein Testversand beim Speichern oder Einschalten des Schalters; echte Zustellung nach Installation noch prüfen.
 
 ### Telegram und eigenes Bild (ab 0.4.3)
 
@@ -220,7 +223,7 @@ Der technische Sensor „Roboterstatus“ behält seine englischen Werte. „Rei
 | `charge_done` | Vollständig geladen | Nein |
 | `goto_charge` | Laderückkehr – unbestätigt | Nein |
 | `cleaning` | Reinigt | Ja |
-| `diving` | Reinigt – taucht ab | Ja |
+| `diving` | Taucht ab → nach 90 Sekunden Reinigt (ab 0.4.4) | Ja; Zeitwechsel ist nur eine Anzeigeableitung |
 | `clean_wait` | Wartet auf Reinigung | Nein |
 | `paused` | Pausiert | Nein |
 | `return_trip` | Rückkehr läuft | Nein |
@@ -234,6 +237,8 @@ Der technische Sensor „Roboterstatus“ behält seine englischen Werte. „Rei
 Nicht bestätigte Bezeichnungen sind aus den Protokollnamen abgeleitet, nicht durch neue Gerätetests belegt. Insbesondere bestätigen `goto_charge` und `dock` **keine autonome Fahrt zur Land-Ladestation**. Das Attribut `status_mapping_verified` kennzeichnet, ob der zuletzt gemeldete technische Status am Testroboter bestätigt wurde; es ist kein Frischeindikator. Dafür dienen `stale` und `last_seen`.
 
 Ein kurzzeitiges `standby` während des beobachteten Laufs/Auftauchens im Wasser überschreibt die laufende Anzeige nicht. Nach Abschluss bleibt die Abschluss-/Parkanzeige bei `standby` ohne aktuelle Bestätigung „außerhalb des Wassers“ erhalten. Eine frische Rückmeldung `sleep` zeigt dagegen immer „Ruhemodus“.
+
+Ab 0.4.4 zeigt eine neu erkannte `diving`-Phase zunächst **„Taucht ab“**, nach **90 Sekunden „Reinigt“**, auch ohne weitere WLAN-Antwort. Wiederholte `diving`-Meldungen verlängern diese Frist nicht. Andere bestätigte Zustände wie Pause, Auftauchen oder trockene Bereitschaft lösen die Anzeige sofort ab; die bestehende Ausnahme für kurzzeitiges `standby` im Wasser bleibt erhalten. Der Beginn ist persistent, ein HA-Neustart startet keine neuen 90 Sekunden. Alte gespeicherte `diving`-Werte ohne brauchbaren Beginn erscheinen konservativ als „Reinigt“. Der Rohsensor bleibt `diving`; weder ein Reinigungsende noch neue Lernwerte oder Steuerbefehle werden durch den Anzeigetimer ausgelöst. Attribute `diving_started_at` und `diving_display_elapsed` kennzeichnen diese Ableitung.
 
 Nach fünf Minuten unerreichbar mit zuletzt bekanntem Ruhe-/Endstatus erscheint wie bisher **„Ausgeschaltet“ (abgeleitet)**. Laufende Reinigung, Tauchen, Auftauchen, Pause und Rückkehr sind davon ausgeschlossen. WLAN-Verlust ist kein bewiesenes Ausschalten; der Rohstatus bleibt erhalten. Gespeicherte Anzeigen werden beim Upgrade migriert und offline als alte Werte gekennzeichnet; dabei werden keine Abschlussereignisse nachträglich ausgelöst.
 
@@ -251,7 +256,7 @@ Der Roboter war nach einem Test mit dem allgemeinen Aus-Datenpunkt weiterhin lok
 
 ## Entwicklung
 
-Änderungen und Installations-/Abnahmeschritte stehen im [Changelog](CHANGELOG.md). Die isolierte Testsuite (`python -m unittest discover -s tests -q`) umfasst 180 erfolgreiche Tests und prüft u. a. echte asyncio-Tasks und Executor-Threads mit simulierten HA-Schnittstellen. Abschluss-Erkennung, Zwei-Stunden-Ladeplanung, Offline-Ableitung, Filterhinweis, Smartphone-/Telegram-Aufrufe, private Bild-Uploads, Laufzeiten-Editor, geschützter Export/Import und alle 16 Statusanzeigen samt Neustart/Migration werden getestet. DP107 und `charging` wurden zuvor zusätzlich live lokal am Testroboter abgefragt. Ein vollständiger HA-Prozesstest, die gerenderte Optionen-Oberfläche, echte Telegram-/Push-Zustellung und ein Reinigungslauf mit Version 0.4.3 stehen nach Installation noch aus.
+Änderungen und Installations-/Abnahmeschritte stehen im [Changelog](CHANGELOG.md). Die isolierte Testsuite (`python -m unittest discover -s tests -q`) umfasst 198 erfolgreiche Tests und prüft u. a. echte asyncio-Tasks und Executor-Threads mit simulierten HA-Schnittstellen. Abschluss-Erkennung, Zwei-Stunden-Ladeplanung, Offline-Ableitung, Filterhinweis, Smartphone-/Telegram-Aufrufe einschließlich der Bildunterschriften für alle 14 Programme, private Bild-Uploads, Laufzeiten-Editor, geschützter Export/Import und alle 16 Statusanzeigen samt Neustart/Migration werden getestet. DP107 und `charging` wurden zuvor zusätzlich live lokal am Testroboter abgefragt. Ein vollständiger HA-Prozesstest, die gerenderte Optionen-Oberfläche, echte Telegram-/Push-Zustellung und ein Reinigungslauf mit Version 0.4.5 stehen nach Installation noch aus.
 
 Das Integrationspaket liegt unter `custom_components/beatbot_aquasense2_local`. Reale Schlüssel, Zugangsdaten, Cloud-Token, persönliche Laufdateien und Benachrichtigungsbilder gehören nicht ins Repository. Tests verwenden synthetische Zugangsdaten. Für Fehlermeldungen bitte [ein Issue öffnen](https://github.com/JS-DE-Tech/hacs-beatbot-aquasense2-local/issues) und nur bereinigte Logs sowie Integrations-/HA-/App-Version angeben – keine Schlüsseldatei oder komplette `.storage`-Datei anhängen.
 

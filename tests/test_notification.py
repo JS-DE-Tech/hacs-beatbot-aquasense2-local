@@ -13,7 +13,8 @@ import test_manager
 import test_runtime_ui
 from custom_components.beatbot_aquasense2_local import notification
 
-CAPTION = "✅ Beatbot fertig.\nAquaSense 2 - Gewähltes Programm beendet."
+CAPTION = "✅ Der Pool ist wieder sauber – AquaSense 2 – Bereich – Boden ×2, Wand & Wasserlinie ×2 beendet."
+PROGRAM_KEY = "Bereich:floor=2:wall=2"
 OPTIONS = {"notify_service": "telegram_bot", "telegram_bot_entry_id": "bot-test",
            "telegram_chat_id": "-1001234567890"}
 PNG = bytes.fromhex("89504e470d0a1a0a") + b"test-image-payload"
@@ -35,13 +36,13 @@ class NotificationTests(unittest.TestCase):
                 notification.parse_chat_id(raw)
 
     def test_exact_text_payload_with_explicit_bot_and_chat(self):
-        domain, service, data = notification.completion_call(OPTIONS)
+        domain, service, data = notification.completion_call(OPTIONS, PROGRAM_KEY)
         self.assertEqual((domain, service), ("telegram_bot", "send_message"))
         self.assertEqual(data, {"config_entry_id": "bot-test", "chat_id": [-1001234567890],
                                 "message": CAPTION, "parse_mode": "plain_text"})
 
     def test_photo_is_one_captioned_message_not_two_messages(self):
-        domain, service, data = notification.completion_call({**OPTIONS, "telegram_photo": "/private/image.jpg"})
+        domain, service, data = notification.completion_call({**OPTIONS, "telegram_photo": "/private/image.jpg"}, PROGRAM_KEY)
         self.assertEqual(service, "send_photo")
         self.assertEqual(data["caption"], CAPTION)
         self.assertNotIn("message", data)
@@ -53,9 +54,44 @@ class NotificationTests(unittest.TestCase):
                 notification.completion_call({key: value for key, value in OPTIONS.items() if key != field})
 
     def test_mobile_app_keeps_routing_and_uses_requested_text(self):
-        domain, service, data = notification.completion_call({"notify_service": "mobile_app_phone"})
+        domain, service, data = notification.completion_call({"notify_service": "mobile_app_phone"}, PROGRAM_KEY)
         self.assertEqual((domain, service), ("notify", "mobile_app_phone"))
-        self.assertEqual(data, {"title": "✅ Beatbot fertig.", "message": "AquaSense 2 - Gewähltes Programm beendet."})
+        self.assertEqual(data, {"title": "✅ Der Pool ist wieder sauber",
+                                "message": "AquaSense 2 – Bereich – Boden ×2, Wand & Wasserlinie ×2 beendet."})
+
+    def test_all_fourteen_programs_have_exact_photo_and_text_payloads(self):
+        labels = {
+            "Boden": "Boden", "Standard": "Standard", "ECO": "ECO",
+            "Bereich:floor=0:wall=1": "Bereich – Boden ×0, Wand & Wasserlinie ×1",
+            "Bereich:floor=0:wall=2": "Bereich – Boden ×0, Wand & Wasserlinie ×2",
+            "Bereich:floor=1:wall=0": "Bereich – Boden ×1, Wand & Wasserlinie ×0",
+            "Bereich:floor=1:wall=1": "Bereich – Boden ×1, Wand & Wasserlinie ×1",
+            "Bereich:floor=1:wall=2": "Bereich – Boden ×1, Wand & Wasserlinie ×2",
+            "Bereich:floor=2:wall=0": "Bereich – Boden ×2, Wand & Wasserlinie ×0",
+            "Bereich:floor=2:wall=1": "Bereich – Boden ×2, Wand & Wasserlinie ×1",
+            "Bereich:floor=2:wall=2": "Bereich – Boden ×2, Wand & Wasserlinie ×2",
+            "MultiZone:1h": "MultiZone – 1h", "MultiZone:2h": "MultiZone – 2h",
+            "MultiZone:Max": "MultiZone – Max",
+        }
+        self.assertEqual(set(labels), set(notification.PROGRAMS))
+        self.assertEqual(len(labels), 14)
+        for key, label in labels.items():
+            with self.subTest(key=key):
+                expected = f"✅ Der Pool ist wieder sauber – AquaSense 2 – {label} beendet."
+                _, service, data = notification.completion_call(OPTIONS, key)
+                self.assertEqual(service, "send_message")
+                self.assertEqual(data["message"], expected)
+                _, service, data = notification.completion_call({**OPTIONS, "telegram_photo": "/private/image.jpg"}, key)
+                self.assertEqual(service, "send_photo")
+                self.assertEqual(data["caption"], expected)
+                self.assertNotIn("message", data)
+                self.assertLess(len(expected), 1024)
+
+    def test_unknown_program_is_not_replaced_by_a_guessed_preset(self):
+        for key in (None, "unknown", "Bereich:floor=0:wall=0"):
+            with self.subTest(key=key):
+                _, _, data = notification.completion_call(OPTIONS, key)
+                self.assertEqual(data["message"], "✅ Der Pool ist wieder sauber – AquaSense 2 – Reinigung beendet (Programm unbekannt).")
 
     def test_private_upload_survives_replacement_and_is_not_public(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -187,7 +223,7 @@ class TelegramManagerTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(self.manager.store.async_save.call_args.args[0]["completion"]["finished"])
         self.hass.services.async_call.side_effect = delivery
         await self.finish()
-        self.assertEqual(self.hass.services.async_call.call_args.args, notification.completion_call(OPTIONS))
+        self.assertEqual(self.hass.services.async_call.call_args.args, notification.completion_call(OPTIONS, "Standard"))
         saved = self.manager._stored_data()
         self.manager.store.async_load.return_value = saved
         await self.manager.async_initialize()
@@ -207,6 +243,7 @@ class TelegramManagerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_photo_send_grants_only_own_folder_and_retains_caption(self):
         await self.configure()
+        self.manager.completion.program_key = PROGRAM_KEY
         with tempfile.TemporaryDirectory() as directory:
             self.hass.config = config_at(directory)
             source = Path(directory) / "upload"
@@ -220,6 +257,45 @@ class TelegramManagerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(call.args[2]["caption"], CAPTION)
             self.assertEqual(self.hass.config.allowlist_external_dirs, {str(Path(photo).parent)})
             self.hass.services.async_call.assert_awaited_once()
+
+    async def test_finished_run_survives_restart_and_changed_preset(self):
+        await self.configure()
+        program = test_manager.manager_module.Program("Bereich", 2, 2)
+        await self.poll_at(0, 0, 90, 0, program)
+        await self.poll_at(5, 5, 90, 1, program)
+        self.manager.store.async_load.return_value = self.manager._stored_data()
+        await self.manager.async_initialize()
+        # A new preset/report must not rename the run that was already started.
+        self.manager.selected_mode = "ECO"
+        await self.poll_at(3000, 13, 61, 2, test_manager.manager_module.Program("ECO"))
+        await self.poll_at(3100, 14, 61, 1)
+        self.assertEqual(self.hass.services.async_call.call_args.args[2]["message"], CAPTION)
+        self.assertEqual(self.manager.store.async_save.call_args.args[0]["completion"]["program_key"], PROGRAM_KEY)
+        self.hass.services.async_call.assert_awaited_once()
+
+    async def test_next_run_uses_its_own_program(self):
+        await self.configure()
+        await self.finish()
+        await self.poll_at(4000, 12, 61, 1, test_manager.manager_module.Program("MultiZone", duration="2h"))
+        await self.poll_at(7000, 13, 41, 2)
+        await self.poll_at(7100, 14, 40, 1)
+        self.assertEqual(self.hass.services.async_call.call_args.args[2]["message"],
+                         "✅ Der Pool ist wieder sauber – AquaSense 2 – MultiZone – 2h beendet.")
+        self.assertEqual(self.hass.services.async_call.await_count, 2)
+
+    async def test_manual_park_retains_program_without_eligible_training(self):
+        await self.configure()
+        await self.finish(park=True)
+        self.assertEqual(self.manager.runtime.history, {})
+        self.assertEqual(self.hass.services.async_call.call_args.args, notification.completion_call(OPTIONS, "Standard"))
+
+    async def test_surface_only_unknown_program_does_not_use_selected_mode(self):
+        await self.configure()
+        self.manager.selected_mode = "Boden"
+        self.manager.last_program_key = "Boden"
+        await self.poll_at(3000, 13, 61, 2)
+        await self.poll_at(3100, 14, 61, 1)
+        self.assertEqual(self.hass.services.async_call.call_args.args, notification.completion_call(OPTIONS))
 
     async def test_missing_photo_logs_failure_without_text_duplicate_or_wider_file_access(self):
         await self.configure()

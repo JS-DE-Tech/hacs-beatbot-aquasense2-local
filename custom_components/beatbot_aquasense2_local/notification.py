@@ -10,9 +10,22 @@ from .const import (
     CONF_NOTIFY_SERVICE, CONF_TELEGRAM_BOT, CONF_TELEGRAM_CHAT,
     CONF_TELEGRAM_PHOTO, TELEGRAM_NOTIFY, DOMAIN,
 )
+from .runtime import PROGRAMS
 
-COMPLETION_TITLE = "✅ Beatbot fertig."
-COMPLETION_MESSAGE = "AquaSense 2 - Gewähltes Programm beendet."
+COMPLETION_TITLE = "✅ Der Pool ist wieder sauber"
+
+
+def completion_message(program_key: str | None) -> str:
+    """Describe the recorded run, never the next selected program."""
+    program = PROGRAMS.get(program_key)
+    if program is None:
+        return "AquaSense 2 – Reinigung beendet (Programm unbekannt)."
+    label = program.mode
+    if program.mode == "Bereich":
+        label += f" – Boden ×{program.floor}, Wand & Wasserlinie ×{program.wall}"
+    elif program.mode == "MultiZone":
+        label += f" – {program.duration}"
+    return f"AquaSense 2 – {label} beendet."
 
 
 def parse_chat_id(value) -> int:
@@ -84,9 +97,10 @@ def validate_photo(hass, value: str) -> str:
     return str(path)
 
 
-def completion_call(options: dict) -> tuple[str, str, dict]:
+def completion_call(options: dict, program_key: str | None = None) -> tuple[str, str, dict]:
     """Explicit recipient only: never use Telegram's default/first chat."""
     service = options.get(CONF_NOTIFY_SERVICE)
+    message = completion_message(program_key)
     if service == TELEGRAM_NOTIFY:
         bot = options.get(CONF_TELEGRAM_BOT)
         if not isinstance(bot, str) or not bot.strip():
@@ -96,7 +110,7 @@ def completion_call(options: dict) -> tuple[str, str, dict]:
             "chat_id": [parse_chat_id(options.get(CONF_TELEGRAM_CHAT))],
             "parse_mode": "plain_text",
         }
-        text = f"{COMPLETION_TITLE}\n{COMPLETION_MESSAGE}"
+        text = f"{COMPLETION_TITLE} – {message}"
         photo = options.get(CONF_TELEGRAM_PHOTO)
         if photo:
             data.update(file=photo, caption=text)
@@ -105,4 +119,4 @@ def completion_call(options: dict) -> tuple[str, str, dict]:
         return TELEGRAM_NOTIFY, "send_message", data
     if not isinstance(service, str) or not service.startswith("mobile_app_"):
         raise ValueError("Select a notification target")
-    return "notify", service, {"title": COMPLETION_TITLE, "message": COMPLETION_MESSAGE}
+    return "notify", service, {"title": COMPLETION_TITLE, "message": message}

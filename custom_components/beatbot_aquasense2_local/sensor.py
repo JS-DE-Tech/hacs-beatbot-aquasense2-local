@@ -109,6 +109,8 @@ class BeatbotCleaningState(BeatbotEntity, SensorEntity):
                 "inference": "offline_idle_5_minutes" if self.manager.inferred_off else None,
                 "last_reported_status": self.manager.robot_status,
                 "status_mapping_verified": self.manager.robot_status in VERIFIED_STATUS_VALUES,
+                "diving_started_at": self.manager.diving_started_at.isoformat() if self.manager.diving_started_at else None,
+                "diving_display_elapsed": self.manager.diving_started_at is not None and self.manager.cleaning_state == "Reinigt",
                 "last_seen": self.manager.last_seen.isoformat() if self.manager.last_seen else None}
 
 

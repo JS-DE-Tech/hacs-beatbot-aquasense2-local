@@ -98,6 +98,45 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(restored.can_park)
         await restored.async_select_mode("Standard")
 
+    async def test_diving_timer_updates_while_polling_is_blocked(self):
+        from datetime import timedelta
+        self.manager.robot_status = "diving"
+        self.manager.cleaning_state = "Taucht ab"
+        self.manager.diving_started_at = manager_module._now()
+        blocked = asyncio.Event()
+        updated = asyncio.Event()
+        self.manager.subscribe(updated.set)
+        self.manager.async_poll = AsyncMock(side_effect=blocked.wait)
+        with patch.object(manager_module, "DIVING_DISPLAY_DURATION", timedelta(milliseconds=40)):
+            self.manager.start()
+            await asyncio.wait_for(updated.wait(), 1)
+            self.assertEqual(self.manager.cleaning_state, "Reinigt")
+            self.assertEqual(self.manager.robot_status, "diving")
+            self.assertIsNone(self.manager._diving_timer)
+            self.assertFalse(self.manager._task.done())
+            await self.manager.async_stop()
+        self.hass.services.async_call.assert_not_awaited()
+
+    async def test_stop_removes_diving_timer_and_reload_uses_original_deadline(self):
+        self.manager.robot_status = "diving"
+        self.manager.cleaning_state = "Taucht ab"
+        started = self.manager.diving_started_at = manager_module._now()
+        self.manager.async_poll = AsyncMock()
+        self.manager.start()
+        timer = self.manager._diving_timer
+        self.assertIsNotNone(timer)
+        self.manager.start()
+        self.assertIs(self.manager._diving_timer, timer)
+        await self.manager.async_stop()
+        self.assertTrue(timer.cancelled())
+        self.assertIsNone(self.manager._diving_timer)
+        saved = self.manager.store.async_save.call_args.args[0]
+        self.assertEqual(saved["diving_started_at"], started.isoformat())
+        self.manager.start()
+        self.assertIsNotNone(self.manager._diving_timer)
+        self.assertEqual(self.manager.diving_started_at, started)
+        await self.manager.async_stop()
+
     async def test_stop_waits_for_photo_validation_worker_without_sending(self):
         started = threading.Event()
         release = threading.Event()

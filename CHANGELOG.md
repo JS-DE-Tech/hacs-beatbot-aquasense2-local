@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.5 – 2026-10-04
+
+- Fertigmeldung enthält jetzt das konkrete Laufprogramm anstelle des festen Textes „Gewähltes Programm“: beispielsweise „✅ Der Pool ist wieder sauber – AquaSense 2 – Bereich – Boden ×2, Wand & Wasserlinie ×2 beendet.“ Alle 14 Varianten einschließlich Bereich-Wiederholungen und MultiZone-Dauer berücksichtigt.
+- Mit persönlichem Telegram-Bild wird der vollständige Text als Bildunterschrift in einer einzigen Fotonachricht versendet, ohne separate zweite Nachricht. Ohne Bild derselbe Text; Smartphone-Push verwendet den ersten Teil als Titel und den Rest als Nachricht. Vorhandene Bild-/Empfängeroptionen bleiben erhalten.
+- Bestätigtes Programm der ersten erkannten Laufphase persistent am Abschluss-Tracker gespeichert, getrennt von der Laufzeit-Lernberechtigung. Spätere Vorauswahl, Teilmeldungen und Neustarts überschreiben es nicht. Neue Läufe erhalten eine eigene Zuordnung; unbekannte Programme und Altstände bleiben ausdrücklich „Programm unbekannt“ statt die aktuelle Vorauswahl zu behaupten. Abschluss-Erkennung, Versand-Deduplizierung sowie Roboter-, Lade-, Park- und Lernfunktionen unverändert; kein Testversand an echte Empfänger.
+- Neun neue Regressionstests mit Unterfällen: exakte Foto-/Textmeldungen für alle 14 Programme, unbekannte Zuordnung, Persistenz und neue Vorauswahl, Folgelauf, manuelles Parken ohne Lernwert, Teilmeldungen/Pause, Reset und Altstände. Insgesamt 198 isolierte Tests erfolgreich. Echte Telegram-/HA-Zustellung mit dieser Version noch nicht getestet.
+
+Installation: Über HACS auf 0.4.5 aktualisieren oder nach HA-Sicherung den vollständigen Integrationsordner aus dem 0.4.5-Paket ersetzen; anschließend HA neu starten. Konfiguration, `.storage` und den privaten Bildordner behalten. Telegram, Chat-ID, Bild und aktivierte „Fertigmeldung“ bleiben bestehen. Beim nächsten bestätigten Abschluss die einzelne Fotonachricht samt richtigem Laufprogramm prüfen. Enthält auch die 90-Sekunden-Anzeige aus 0.4.4; keine automatische HA-Installation.
+
+## 0.4.4 – 2026-10-03 (nicht separat veröffentlicht; enthalten in 0.4.5)
+
+- `diving` zeigt im Reinigungsstatus jetzt zunächst „Taucht ab“ und nach 90 Sekunden „Reinigt“. Separater Anzeige-Callback aktualisiert die HA-Entität auch während einer WLAN-Lücke oder laufenden/blockierten Statusabfrage. Der technische Roboterstatus wird nicht überschrieben.
+- Wiederholte `diving`-Meldungen und fehlende Daten verlängern den Zeitraum nicht. Neue bestätigte Zustände lösen die Anzeige sofort ab; vorübergehendes `standby` im Wasser erhält wie bisher den aktiven Status. Eine neue Tauchphase nach einem anderen bestätigten Zustand startet einen neuen Zeitraum.
+- Beginn persistent; Reload/HA-Neustart setzt die verbleibende Zeit fort. Abgelaufene Fristen und Altstände ohne verlässlichen Zeitstempel zeigen „Reinigt“, ohne einen frischen Tauchbeginn zu erfinden. Timer wird beim Stop entfernt und beim Start bei Bedarf neu eingeplant. Zusätzliche Sensorattribute kennzeichnen den Zeitpunkt und den zeitbasierten Übergang.
+- Lade-, Park-, Programm-, Filter-, Benachrichtigungs- und Lernregeln unverändert. Neun neue Regressionstests: 90-Sekunden-Grenze, Wiederholungen, Offline-Anzeige, Neustart/Altstände, Statuswechsel, transiente Bereitschaft und Timer-Lifecycle einschließlich blockierter Abfrage. Insgesamt 189 isolierte Tests erfolgreich; kein neuer physischer Roboter-/HA-Livetest.
+
+Diese Änderungen wurden zunächst lokal getestet und sind jetzt in 0.4.5 enthalten. Für die Installation das Paket 0.4.5 verwenden; Konfiguration und `.storage` behalten.
+
 ## 0.4.3 – 2026-10-03
 
 - Erste GitHub-Veröffentlichung vorbereitet: README im Stil des ASEKO-Projekts mit transparentem Produktbild, Badges und ausdrücklich als Beispiel markiertem HA-Dashboard-Screenshot. Ausführliche Anleitung `docs/LOCAL_KEY.md` für den eigenen ADB-/HA-Schlüsselexport, KeePass, Import und Fehlersuche; Grenzen des mit Android-App 2.4.1 nachgewiesenen Verfahrens ausdrücklich dokumentiert. Keine privaten Schlüssel oder Benachrichtigungsbilder im Paket. MIT-Quellcodelizenz, Bildnachweise und GitHub-Testworkflow ergänzt.
