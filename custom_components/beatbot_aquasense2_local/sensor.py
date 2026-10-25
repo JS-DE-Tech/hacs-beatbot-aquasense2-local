@@ -96,7 +96,11 @@ class BeatbotCleaningState(BeatbotEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        return "Ausgeschaltet" if self.manager.inferred_off else self.manager.cleaning_state
+        if self.manager.inferred_off:
+            return "Ausgeschaltet"
+        if self.manager.charging_ended:
+            return "Laden beendet"
+        return self.manager.cleaning_state
 
     @property
     def available(self) -> bool:
@@ -106,7 +110,9 @@ class BeatbotCleaningState(BeatbotEntity, SensorEntity):
     def extra_state_attributes(self) -> dict:
         return {"stale": not self.manager.online,
                 "inferred_off": self.manager.inferred_off,
-                "inference": "offline_idle_5_minutes" if self.manager.inferred_off else None,
+                "charging_ended": self.manager.charging_ended,
+                "inference": ("offline_idle_5_minutes" if self.manager.inferred_off else
+                              "charger_switch_off" if self.manager.charging_ended else None),
                 "last_reported_status": self.manager.robot_status,
                 "status_mapping_verified": self.manager.robot_status in VERIFIED_STATUS_VALUES,
                 "diving_started_at": self.manager.diving_started_at.isoformat() if self.manager.diving_started_at else None,

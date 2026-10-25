@@ -572,6 +572,13 @@ class BeatbotManager:
             await self._check_charger(now, battery if type(battery) is int else None)
 
     @property
+    def charging_ended(self) -> bool:
+        """The plug ended charging; the last robot report may still say charging."""
+        return (self.robot_status == "charging"
+                and self.charge_guard.blocked
+                and self._charger_state() == "off")
+
+    @property
     def inferred_off(self) -> bool:
         return (not self.online and self._offline_since is not None
                 and self.robot_status in OFFLINE_IDLE_STATES

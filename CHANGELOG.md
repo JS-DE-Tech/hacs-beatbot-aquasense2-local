@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.7 – 2026-10-25
+
+- „Reinigungsstatus“ zeigt nach bestätigtem Ladestations-Aus sofort „Laden beendet“, wenn die letzte Robotermeldung noch `charging` ist und die Ladesperre besteht. Gilt für manuelles Ausschalten und automatische Ladeziel-Abschaltung, auch nach Reload. Der letzte Akkuwert und technische Roboterstatus bleiben erhalten; keine zusätzliche Roboterabfrage für die Anzeige.
+- Diagnoseattribute `charging_ended` und `inference: charger_switch_off` kennzeichnen die Ableitung. Erneutes Einschalten aktiviert weiterhin Akkuabfragen; das nächste manuelle oder automatische Ausschalten startet erneut die bestehende Funkstille von zwei Stunden und 15 Minuten. Hinweise zur Ladeanimation persönlicher Karten in der README ergänzt.
+- Sechs Regressionstests für Anzeige, Wiederanlauf, erneute Abschaltung, Funkstille, Reload, verspätete Ladeantwort und unbekannte Steckdosenzustände. Alle 216 isolierten Tests erfolgreich. Kein HA-/Dashboard-Livetest und keine automatische Installation.
+
+Enthält sämtliche Änderungen aus 0.4.6 und ersetzt dessen GitHub-Release. Installation: Über HACS auf 0.4.7 aktualisieren und anschließend Home Assistant neu starten. Konfiguration und `.storage` behalten. Persönliche Dashboard-Karten werden nicht automatisch geändert: Die Ladeanimation an „Reinigungsstatus“ = „Lädt“ und eingeschaltete „Ladestation“ koppeln, nicht allein an den gespeicherten Rohstatus `charging`.
+
 ## 0.4.6 – 2026-10-25
 
 - Ab frischer Ladeerkennung bei eingeschalteter Ladesteckdose persistente Sperre für Roboter-Steuerbefehle. Die erste `charging`-Antwort verhindert bereits im Transport das Schreiben vorgemerkter Einstellungen. Akkuabfragen und Ladeziel-Abschaltung bleiben während des Ladens aktiv.

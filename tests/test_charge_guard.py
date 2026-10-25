@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import test_manager
+from test_runtime_ui import sensor_module
 from test_manager import manager_module
 from test_protocol import FakeDevice, protocol
 
@@ -134,6 +135,88 @@ class ChargeGuardTests(unittest.IsolatedAsyncioTestCase):
             await self.manager.async_set_charging(False)
         self.assertEqual(self.manager.charge_guard.next_poll_at, self.at(FIRST_PROBE + 110))
         self.assertEqual(FakeDevice.writes, [])
+
+    async def test_cutoff_immediately_ends_display_without_robot_query(self):
+        await self.charged()
+        sensor = sensor_module.BeatbotCleaningState(self.manager)
+        self.hass.async_add_executor_job.reset_mock()
+        self.assertEqual(sensor.native_value, "Laden beendet")
+        self.assertTrue(sensor.extra_state_attributes["charging_ended"])
+        self.assertEqual(sensor.extra_state_attributes["inference"], "charger_switch_off")
+        self.assertEqual(sensor.extra_state_attributes["last_reported_status"], "charging")
+        self.assertEqual(self.manager.battery, 80)
+        await self.poll(30)
+        self.assertEqual(sensor.native_value, "Laden beendet")
+        self.hass.async_add_executor_job.assert_not_awaited()
+        self.assertIsNone(self.manager.last_completion_at)
+        self.assertFalse(self.manager.filter_cleaning_required)
+        self.assertEqual(self.manager.runtime.history, {})
+
+    async def test_manual_off_ends_display_and_restarts_silence(self):
+        await self.charged()
+        with patch.object(manager_module, "_now", return_value=self.at(100)):
+            await self.manager.async_set_charging(True)
+        await self.poll(105, status=2, battery=50)
+        sensor = sensor_module.BeatbotCleaningState(self.manager)
+        self.assertEqual(sensor.native_value, "Lädt")
+        self.assertFalse(sensor.extra_state_attributes["charging_ended"])
+        with patch.object(manager_module, "_now", return_value=self.at(110)):
+            await self.manager.async_set_charging(False)
+        self.assertEqual(sensor.native_value, "Laden beendet")
+        self.assertEqual(self.manager.charge_state, "plug_off")
+        self.hass.async_add_executor_job.reset_mock()
+        await self.poll(FIRST_PROBE + 109)
+        self.hass.async_add_executor_job.assert_not_awaited()
+        self.assertEqual(self.manager.battery, 50)
+        self.assertEqual(FakeDevice.writes, [])
+
+    async def test_external_restart_monitors_until_automatic_cutoff_again(self):
+        await self.charged()
+        self.plug = "on"
+        event = types.SimpleNamespace(data={"old_state": types.SimpleNamespace(state="off"),
+                                           "new_state": types.SimpleNamespace(state="on")})
+        with patch.object(manager_module, "_now", return_value=self.at(100)):
+            self.manager._on_switch_changed(event)
+        self.assertTrue(self.manager._wake.is_set())
+        self.assertTrue(self.manager.charge_guard.poll_due(self.at(100)))
+        await self.poll(101, status=2, battery=79)
+        self.assertEqual(self.plug, "on")
+        self.assertEqual(self.manager.battery, 79)
+        self.assertEqual(sensor_module.BeatbotCleaningState(self.manager).native_value, "Lädt")
+        await self.poll(106, status=2, battery=80)
+        self.assertEqual(self.plug, "off")
+        self.assertEqual(sensor_module.BeatbotCleaningState(self.manager).native_value, "Laden beendet")
+        self.assertEqual(self.manager.charge_guard.next_poll_at, self.at(FIRST_PROBE + 106))
+        self.hass.async_add_executor_job.reset_mock()
+        await self.poll(FIRST_PROBE + 105)
+        self.hass.async_add_executor_job.assert_not_awaited()
+        self.assertEqual(FakeDevice.writes, [])
+
+    async def test_ended_display_survives_reload_and_stale_charging_reply(self):
+        await self.charged()
+        await self.restore()
+        sensor = sensor_module.BeatbotCleaningState(self.manager)
+        self.assertEqual(sensor.native_value, "Laden beendet")
+        await self.poll(FIRST_PROBE, status=2)
+        self.assertEqual(sensor.native_value, "Laden beendet")
+        self.assertTrue(self.manager.charge_guard.blocked)
+        self.assertEqual(FakeDevice.writes, [])
+
+    async def test_fresh_noncharging_status_replaces_ended_display(self):
+        await self.charged()
+        await self.poll(FIRST_PROBE, status=6)
+        sensor = sensor_module.BeatbotCleaningState(self.manager)
+        self.assertEqual(sensor.native_value, "Ruhemodus")
+        self.assertFalse(sensor.extra_state_attributes["charging_ended"])
+        self.assertTrue(self.manager.charge_guard.blocked)
+
+    async def test_unavailable_plug_does_not_claim_charging_ended(self):
+        self.plug = "on"
+        await self.poll(0, status=2, battery=70)
+        self.plug = "unavailable"
+        sensor = sensor_module.BeatbotCleaningState(self.manager)
+        self.assertEqual(sensor.native_value, "Lädt")
+        self.assertFalse(sensor.extra_state_attributes["charging_ended"])
 
     async def test_repeated_off_or_unknown_switch_does_not_extend_pause_or_unlock(self):
         await self.charged()
