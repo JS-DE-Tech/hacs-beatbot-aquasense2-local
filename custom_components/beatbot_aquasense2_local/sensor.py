@@ -139,6 +139,10 @@ class BeatbotChargeState(BeatbotEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return {"switch_entity": self.manager.charger_switch,
+                "commands_blocked_until_power_cycle": self.manager.charge_guard.blocked,
+                "command_guard_phase": self.manager.charge_guard.phase,
+                "next_robot_poll_at": (self.manager.charge_guard.next_poll_at.isoformat()
+                                       if self.manager.charge_guard.next_poll_at else None),
                 "target_percent": self.manager.charge_target}
 
 

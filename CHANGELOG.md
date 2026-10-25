@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.6 – 2026-10-25
+
+- Ab frischer Ladeerkennung bei eingeschalteter Ladesteckdose persistente Sperre für Roboter-Steuerbefehle. Die erste `charging`-Antwort verhindert bereits im Transport das Schreiben vorgemerkter Einstellungen. Akkuabfragen und Ladeziel-Abschaltung bleiben während des Ladens aktiv.
+- Nach Shelly-Aus zwei Stunden und 15 Minuten vollständige Abfragepause (beobachtete ein bis zwei Stunden bis zum automatischen Ausschalten plus Reserve), danach Prüfungen höchstens alle fünf Minuten. Freigabe erst nach zwei erfolglosen Verbindungsprüfungen über mindestens fünf Minuten und anschließender erfolgreicher Rückkehr ohne Lademeldung bei ausgeschaltetem Shelly. Aktive Reinigung, kurze WLAN-Lücken und die Pause selbst zählen nicht als Ausschalten. Die erste Rückkehr-Abfrage sendet noch keine Steuerbefehle.
+- Auswahl und Optionen bleiben lokal vorgemerkt, Sperre/Frist/bestätigte Ausschaltphase überleben HA-Neustarts. Erneutes Shelly-Ein startet nur die Akkuüberwachung; erneutes Aus beginnt eine neue Pause. Frisch bereits passend zurückgemeldete Programmeinstellungen werden ohne erneutes Schreiben bestätigt.
+- Diagnoseattribute für Sperre, Phase und nächste Roboterabfrage ergänzt. Zwölf neue Regressionstests, insgesamt 210 isolierte Tests erfolgreich. Physisches Einschlafen/Ausschalten sowie vollständiger HA-Livetest stehen aus.
+
+Installation: Über HACS auf 0.4.6 aktualisieren oder den vollständigen Integrationsordner einschließlich `charge_guard.py` übernehmen; anschließend HA neu starten. Konfiguration und `.storage` behalten. Beim nächsten Ladezyklus Ladeziel-Abschaltung, zwei Stunden und 15 Minuten Abfragepause und Freigabe erst nach beobachteter Aus-/Ein-Phase prüfen. Kein automatisches Update der persönlichen Dashboard-Karte und keine automatische HA-Installation.
+
 ## 0.4.5 – 2026-10-04
 
 - Fertigmeldung enthält jetzt das konkrete Laufprogramm anstelle des festen Textes „Gewähltes Programm“: beispielsweise „✅ Der Pool ist wieder sauber – AquaSense 2 – Bereich – Boden ×2, Wand & Wasserlinie ×2 beendet.“ Alle 14 Varianten einschließlich Bereich-Wiederholungen und MultiZone-Dauer berücksichtigt.

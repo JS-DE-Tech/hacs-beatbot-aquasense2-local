@@ -31,6 +31,7 @@ class BeatbotCleaningMode(BeatbotEntity, SelectEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return {"pending_until_idle": self.manager.mode_pending,
+                "commands_blocked_until_power_cycle": self.manager.charge_guard.blocked,
                 "last_confirmed_mode": self.manager.last_mode}
 
     async def async_select_option(self, option: str) -> None:

@@ -39,11 +39,12 @@ from .const import (
     LEGACY_STATUS_LABELS,
     DIVING_DISPLAY_DURATION,
 )
-from .protocol import LocalBeatbot, decode_mode, discover, status_name, decode_filter_basket_missing
+from .protocol import BeatbotConnectionError, LocalBeatbot, decode_mode, discover, status_name, decode_filter_basket_missing
 from .policy import charge_cutoff_due
 from .runtime import Program, RuntimeLearner, MULTI_DURATIONS, MAX_EDGE_GAP, MAX_RUN, READY, PROGRAMS
 from .runtime_file import export_runtime_file
 from .charging import CooldownCharging
+from .charge_guard import ChargeCommandGuard
 from .completion import CompletionTracker
 from .notification import completion_call, validate_photo
 
@@ -94,6 +95,7 @@ class BeatbotManager:
         self.multi_duration = "Max"
         self.runtime = RuntimeLearner()
         self.cooldown = CooldownCharging()
+        self.charge_guard = ChargeCommandGuard()
         self.completion = CompletionTracker()
         self.filter_cleaning_required = False
         self.completion_notifications = False
@@ -132,6 +134,7 @@ class BeatbotManager:
     async def async_initialize(self) -> None:
         """Load only non-secret state. The local key stays in HA's config entry."""
         saved = await self.store.async_load() or {}
+        self.charge_guard.restore(saved.get("charge_guard"))
         self.runtime.restore(saved.get("runtime"))
         self.completion.restore(saved.get("completion"))
         self.filter_cleaning_required = saved.get("filter_cleaning_required") is True
@@ -325,6 +328,7 @@ class BeatbotManager:
             "completion_notifications": self.completion_notifications,
             "last_completion_at": self.last_completion_at.isoformat() if self.last_completion_at else None,
             "cooldown": self.cooldown.dump(),
+            "charge_guard": self.charge_guard.dump(),
             "cooldown_switch": self.charger_switch,
             "program_options": {"floor": self.floor_count, "wall": self.wall_count, "duration": self.multi_duration},
             "last_mode": self.last_mode,
@@ -352,6 +356,8 @@ class BeatbotManager:
         new = event.data.get("new_state")
         if new is None:
             return
+        self.charge_guard.switch_observed(new.state, _now())
+        self._save_soon()
         if new.state in {"on", "off"} and old and old.state in {"on", "off"} and old.state != new.state:
             if not self._auto_charge_command and not (new.state == "off" and self.cutoff_requested_at):
                 self.cooldown.manual()
@@ -395,21 +401,36 @@ class BeatbotManager:
             if self._stopping:
                 return
             now = _now()
+            switch_at_poll = self._charger_state()
+            self.charge_guard.switch_observed(switch_at_poll, now)
+            if not self.charge_guard.poll_due(now):
+                self._save_soon()
+                return
+            self.charge_guard.probe_started(now)
+            self._save_soon()
             if self.park_pending and self.park_requested_at and now - self.park_requested_at >= PARK_MAX_DURATION:
                 self.park_pending = False
                 self.park_state = "timed_out"
                 self._save_soon()
             park_due = (
-                self.park_pending
+                not self.charge_guard.blocked
+                and self.park_pending
                 and not self.floor_only
                 and self._park_delay_elapsed(now)
                 and self.park_state != "accepted"
                 and (not self.last_park_send_at or now - self.last_park_send_at >= PARK_RETRY_INTERVAL)
             )
-            mode_to_set = self.selected_program if self.mode_pending and not self.park_pending else None
+            mode_to_set = (self.selected_program if self.mode_pending and not self.park_pending
+                           and not self.charge_guard.blocked else None)
             try:
                 result = await self._async_executor(self.client.poll, park_due, mode_to_set)
             except Exception as err:
+                self.charge_guard.probe_failed(
+                    now, switch_off=self._charger_state() == "off",
+                    eligible=isinstance(err, (BeatbotConnectionError, OSError))
+                    and self.robot_status in OFFLINE_IDLE_STATES | {"charging"})
+                if self.charge_guard.blocked:
+                    await self.store.async_save(self._stored_data())
                 self.online = False
                 if self._offline_since is None:
                     self._offline_since = now
@@ -440,6 +461,17 @@ class BeatbotManager:
                 self.battery = battery
                 self.battery_seen = now
             state = status_name(dps)
+            guard_before = self.charge_guard.dump()
+            if state == "charging" and (switch_at_poll == "on" or self._charger_state() == "on"):
+                self.charge_guard.charging_observed()
+                self.charge_guard.switch_observed(self._charger_state(), _now())
+            else:
+                self.charge_guard.probe_succeeded(
+                    switch_off=self._charger_state() == "off", charging=state == "charging")
+            if self.charge_guard.dump() != guard_before:
+                # Persist the lock before charge cutoff, and confirmed recovery
+                # before the next poll can transmit a queued selection.
+                await self.store.async_save(self._stored_data())
             observed_program = Program.from_dps(dps)
             if observed_program:
                 self.last_program_key = observed_program.key
@@ -660,6 +692,10 @@ class BeatbotManager:
             self.charge_state = "waiting_for_robot"
             self._notify()
 
+    def _charger_state(self) -> str | None:
+        state = self.hass.states.get(self.charger_switch) if self.charger_switch else None
+        return state.state if state else None
+
     async def _check_charger(self, now: datetime, fresh_battery: int | None) -> None:
         switch = self.charger_switch
         if not switch:
@@ -706,7 +742,8 @@ class BeatbotManager:
     @property
     def can_park(self) -> bool:
         return (
-            self.active_mode is not None
+            not self.charge_guard.blocked
+            and self.active_mode is not None
             and not self.floor_only
             and self._park_delay_elapsed(_now())
             and (self.robot_status in PARK_ACTIVE_STATES or self.park_pending)

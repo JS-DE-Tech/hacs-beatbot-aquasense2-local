@@ -135,10 +135,16 @@ class LocalBeatbot:
             dps = response["dps"]
             result = PollResult(dps=dps)
             state = status_name(dps)
+            # The manager only learns about this response after poll returns.
+            # Block writes here already on the first fresh charging report.
+            if state == "charging":
+                return result
             if mode_to_set and state in IDLE_STATES:
                 program = mode_to_set if isinstance(mode_to_set, Program) else Program(mode_to_set)
                 result.mode_confirmed = True
                 for dp, value in program.writes().items():
+                    if dps.get(dp) == value:
+                        continue  # Fresh readback also confirms an earlier write.
                     self._check_stop()
                     written = device.set_value(dp, value)
                     confirmed = (isinstance(written, dict)
